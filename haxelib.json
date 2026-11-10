@@ -1,0 +1,11 @@
+{
+  "name": "funkfmpeg",
+  "url": "https://github.com/TheJarret084/FunkFMPEG",
+  "license": "MIT",
+  "tags": ["png", "spritesheet", "palette", "image", "video-frames", "rgba"],
+  "description": "this cosa is a library to make indexed PNG, writing, and compression use Haxe code and the Haxe standard library.",
+  "version": "1.1.0",
+  "classPath": "src",
+  "releasenote": "FunkFMPEG 1.1.0: auto max-size frames, area-average downscale, refined palette. Straight horizontal indexed PNG strips, automatic scaling, global RGBA palette, optional alpha preservation.",
+  "contributors": ["TheJarret084"]
+}
