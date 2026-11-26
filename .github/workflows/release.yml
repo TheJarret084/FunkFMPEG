@@ -91,9 +91,11 @@ jobs:
           TOOLBIN="$RUNNER_TEMP/ndk-shims"
           mkdir -p "$TOOLBIN"
           NDKBIN="$(dirname "$AR")"
-          ln -sf "$NDKBIN/llvm-ar" "$TOOLBIN/arm-linux-androideabi-ar"
-          ln -sf "$NDKBIN/llvm-ranlib" "$TOOLBIN/arm-linux-androideabi-ranlib"
-          ln -sf "$NDKBIN/llvm-strip" "$TOOLBIN/arm-linux-androideabi-strip"
+          for prefix in arm-linux-androideabi aarch64-linux-android; do
+            ln -sf "$NDKBIN/llvm-ar" "$TOOLBIN/$prefix-ar"
+            ln -sf "$NDKBIN/llvm-ranlib" "$TOOLBIN/$prefix-ranlib"
+            ln -sf "$NDKBIN/llvm-strip" "$TOOLBIN/$prefix-strip"
+          done
           export PATH="$TOOLBIN:$PATH"
           (cd project && haxelib run hxcpp Build.xml -Dandroid -DHXCPP_ARM64 -Dstatic_link -DFFMPEG_DIR="$PWD/ffmpeg" -DANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot")
           ls -R ndll
