@@ -63,7 +63,7 @@ jobs:
         with:
           msystem: MSYS
           path-type: inherit
-          install: make nasm diffutils git pkg-config
+          install: make nasm diffutils git pkg-config zip
       - name: FFmpeg (windows)
         if: matrix.name == 'windows-x64' && steps.ffcache.outputs.cache-hit != 'true'
         shell: msys2 {0}
@@ -105,8 +105,16 @@ jobs:
           printf 'create merged.a\naddlib %s\naddlib %s/libavformat.a\naddlib %s/libavcodec.a\naddlib %s/libswscale.a\naddlib %s/libswresample.a\naddlib %s/libavutil.a\nsave\nend\n' "$LIB" "$FF" "$FF" "$FF" "$FF" "$FF" | "$AR" -M
           mv merged.a "$LIB"
 
-      - name: Empaquetar
+      - name: Empaquetar (unix)
+        if: matrix.name != 'windows-x64'
         shell: bash
+        run: |
+          ls -R ndll
+          cd ndll && zip -r ../funkfmpeg-ndll-${{ matrix.name }}.zip .
+
+      - name: Empaquetar (windows)
+        if: matrix.name == 'windows-x64'
+        shell: msys2 {0}
         run: |
           ls -R ndll
           cd ndll && zip -r ../funkfmpeg-ndll-${{ matrix.name }}.zip .
