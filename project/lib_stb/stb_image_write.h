@@ -279,6 +279,8 @@ STBIWDEF void stbi_flip_vertically_on_write(int flip_boolean);
 #define STBIW_ASSERT(x) assert(x)
 #endif
 
+#include <climits>
+
 #define STBIW_UCHAR(x) (unsigned char) ((x) & 0xff)
 
 #ifdef STB_IMAGE_WRITE_STATIC

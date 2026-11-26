@@ -11,6 +11,7 @@
 		<compilerflag value="-Ilib_ogg/include"/>
 		<compilerflag value="-Ilib_vorbis/include"/>
 		<compilerflag value="-Ilib_vorbis/lib"/>
+		<compilerflag value="--sysroot=${ANDROID_SYSROOT}" if="android" />
 
 		<file name="common/VideoExtract.cpp" />
 	</files>
@@ -20,6 +21,7 @@
 		<compilerflag value="-Ilib_ogg/include"/>
 		<compilerflag value="-Ilib_vorbis/include"/>
 		<compilerflag value="-Ilib_vorbis/lib"/>
+		<compilerflag value="--sysroot=${ANDROID_SYSROOT}" if="android" />
 		<compilerflag value="-fvisibility=hidden" unless="windows"/>
 
 		<file name="lib_ogg/src/bitwise.c" />
