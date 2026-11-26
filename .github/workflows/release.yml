@@ -42,7 +42,7 @@ jobs:
         if: matrix.name == 'linux-x64' && steps.ffcache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update && sudo apt-get install -y nasm
-          building/build_ffmpeg.sh "$PWD/project/ffmpeg"
+          bash building/build_ffmpeg.sh "$PWD/project/ffmpeg"
 
       # ---- Android arm64 (NDK de la imagen del runner, cross-compile)
       - name: FFmpeg (android)
@@ -50,7 +50,7 @@ jobs:
         run: |
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
           TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          building/build_ffmpeg.sh "$PWD/project/ffmpeg" \
+          bash building/build_ffmpeg.sh "$PWD/project/ffmpeg" \
             --enable-cross-compile --target-os=android --arch=aarch64 --cpu=armv8-a \
             --cc="$TC/aarch64-linux-android21-clang" --cxx="$TC/aarch64-linux-android21-clang++" \
             --ar="$TC/llvm-ar" --nm="$TC/llvm-nm" --ranlib="$TC/llvm-ranlib" --strip="$TC/llvm-strip"
@@ -69,11 +69,11 @@ jobs:
         shell: msys2 {0}
         run: |
           mv /usr/bin/link.exe /usr/bin/link.exe.bak || true
-          building/build_ffmpeg.sh "$PWD/project/ffmpeg" --toolchain=msvc
+          bash building/build_ffmpeg.sh "$PWD/project/ffmpeg" --toolchain=msvc
 
       - name: libogg + libvorbis
         shell: bash
-        run: building/fetch_vorbis.sh
+        run: bash building/fetch_vorbis.sh
 
       - name: Compilar ndll (desktop)
         if: matrix.name != 'android-arm64'
@@ -123,8 +123,31 @@ jobs:
           for z in dist/funkfmpeg-ndll-*.zip; do unzip -q -o "$z" -d pkg/funkfmpeg/ndll; done
           cd pkg/funkfmpeg && zip -r ../../haxelib-FunkFMPEG.zip .
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            haxelib-FunkFMPEG.zip
-            dist/funkfmpeg-ndll-*.zip
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\" and .draft == true) | .id"); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id" >/dev/null || true
+          done
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Subiendo artefactos al release $TAG (intento $attempt)..."
+              if gh release upload "$TAG" haxelib-FunkFMPEG.zip dist/funkfmpeg-ndll-*.zip --clobber; then
+                exit 0
+              fi
+            else
+              echo "Creando release $TAG (intento $attempt)..."
+              if gh release create "$TAG" haxelib-FunkFMPEG.zip dist/funkfmpeg-ndll-*.zip --title "$TAG" --generate-notes; then
+                exit 0
+              fi
+            fi
+            echo "GitHub API fallo; reintentando en 45s..."
+            sleep 45
+          done
+          echo "No se pudo publicar el release $TAG" >&2
+          exit 1
