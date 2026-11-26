@@ -1,0 +1,130 @@
+name: release
+
+# commit.sh sube un tag (0.1.X) -> compila los ndll (Windows 64, Linux 64, Android arm64) y los pega a la release.
+on:
+  push:
+    tags: ['*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FFMPEG_TAG: n7.1.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  name: linux-x64 }
+          - { os: windows-latest, name: windows-x64 }
+          - { os: ubuntu-latest,  name: android-arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+      - run: haxelib install hxcpp --quiet
+
+      - name: FFmpeg cache
+        id: ffcache
+        uses: actions/cache@v4
+        with:
+          path: project/ffmpeg
+          key: ffmpeg-${{ matrix.name }}-${{ env.FFMPEG_TAG }}-${{ hashFiles('building/build_ffmpeg.sh') }}
+
+      # ---- Linux 64
+      - name: FFmpeg (linux)
+        if: matrix.name == 'linux-x64' && steps.ffcache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y nasm
+          building/build_ffmpeg.sh "$PWD/project/ffmpeg"
+
+      # ---- Android arm64 (NDK de la imagen del runner, cross-compile)
+      - name: FFmpeg (android)
+        if: matrix.name == 'android-arm64' && steps.ffcache.outputs.cache-hit != 'true'
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          building/build_ffmpeg.sh "$PWD/project/ffmpeg" \
+            --enable-cross-compile --target-os=android --arch=aarch64 --cpu=armv8-a \
+            --cc="$TC/aarch64-linux-android21-clang" --cxx="$TC/aarch64-linux-android21-clang++" \
+            --ar="$TC/llvm-ar" --nm="$TC/llvm-nm" --ranlib="$TC/llvm-ranlib" --strip="$TC/llvm-strip"
+
+      # ---- Windows 64 (MSVC, para que hxcpp enlace libav*.a como en el resto del ndll)
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.name == 'windows-x64'
+      - uses: msys2/setup-msys2@v2
+        if: matrix.name == 'windows-x64'
+        with:
+          msystem: MSYS
+          path-type: inherit
+          install: make nasm diffutils git pkg-config
+      - name: FFmpeg (windows)
+        if: matrix.name == 'windows-x64' && steps.ffcache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          mv /usr/bin/link.exe /usr/bin/link.exe.bak || true
+          building/build_ffmpeg.sh "$PWD/project/ffmpeg" --toolchain=msvc
+
+      - name: libogg + libvorbis
+        shell: bash
+        run: building/fetch_vorbis.sh
+
+      - name: Compilar ndll (desktop)
+        if: matrix.name != 'android-arm64'
+        shell: bash
+        working-directory: project
+        run: haxelib run hxcpp Build.xml -DHXCPP_M64 -DFFMPEG_DIR="$PWD/ffmpeg"
+
+      - name: Compilar ndll (android, estatico + fusion con libav)
+        if: matrix.name == 'android-arm64'
+        shell: bash
+        run: |
+          export ANDROID_NDK_ROOT="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          AR="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          (cd project && haxelib run hxcpp Build.xml -Dandroid -DHXCPP_ARM64 -Dstatic_link -DFFMPEG_DIR="$PWD/ffmpeg")
+          ls -R ndll
+          LIB="$(find ndll -name 'libfunkfmpeg*.a' | head -n1)"
+          [ -n "$LIB" ] || { echo "no se genero libfunkfmpeg.a"; exit 1; }
+          FF="$PWD/project/ffmpeg/lib"
+          printf 'create merged.a\naddlib %s\naddlib %s/libavformat.a\naddlib %s/libavcodec.a\naddlib %s/libswscale.a\naddlib %s/libswresample.a\naddlib %s/libavutil.a\nsave\nend\n' "$LIB" "$FF" "$FF" "$FF" "$FF" "$FF" | "$AR" -M
+          mv merged.a "$LIB"
+
+      - name: Empaquetar
+        shell: bash
+        run: |
+          ls -R ndll
+          cd ndll && zip -r ../funkfmpeg-ndll-${{ matrix.name }}.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ndll-${{ matrix.name }}
+          path: funkfmpeg-ndll-${{ matrix.name }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # haxelib completo: src + include.xml + ndll de todas las plataformas
+      - name: Armar zip de haxelib
+        run: |
+          mkdir -p pkg/funkfmpeg
+          cp -r src examples haxelib.json include.xml LICENSE README.md THIRD_PARTY.md icon.png pkg/funkfmpeg/
+          for z in dist/funkfmpeg-ndll-*.zip; do unzip -q -o "$z" -d pkg/funkfmpeg/ndll; done
+          cd pkg/funkfmpeg && zip -r ../../haxelib-FunkFMPEG.zip .
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            haxelib-FunkFMPEG.zip
+            dist/funkfmpeg-ndll-*.zip

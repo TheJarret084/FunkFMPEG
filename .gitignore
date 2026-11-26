@@ -1,0 +1,7 @@
+palette.png
+palette.txt
+filmstrip.png
+*.n
+project/ffmpeg/
+ffmpeg-src/
+project/obj/

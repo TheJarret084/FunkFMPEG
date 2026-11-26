@@ -1,0 +1,21 @@
+{
+  "name": "funkfmpeg",
+  "url": "https://github.com/TheJarret084/FunkFMPEG",
+  "license": "MIT",
+  "tags": [
+    "png",
+    "spritesheet",
+    "palette",
+    "image",
+    "video-frames",
+    "rgba",
+    "android"
+  ],
+  "description": "Indexed PNG spritesheets/tapes and video frame extraction (FFmpeg libav, statically linked; Windows/Linux/Android 64) for Haxe/Lime.",
+  "version": "1.4.0",
+  "classPath": "src",
+  "releasenote": "1.4.0: VideoFrames now uses FFmpeg (static LGPL build) on Windows, Linux and Android arm64 instead of minimp4+h264bsd / MediaMetadataRetriever.",
+  "contributors": [
+    "TheJarret084"
+  ]
+}

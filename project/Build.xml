@@ -1,0 +1,89 @@
+<xml>
+	<include name="${HXCPP}/build-tool/BuildCommon.xml"/>
+
+	<!-- FFmpeg estatico (lo deja building/build_ffmpeg.sh). Se puede cambiar con -DFFMPEG_DIR=ruta -->
+	<set name="FFMPEG_DIR" value="${this_dir}/ffmpeg" unless="FFMPEG_DIR" />
+
+	<files id="common">
+		<compilerflag value="-I${FFMPEG_DIR}/include"/>
+		<compilerflag value="-Ilib_stb"/>
+		<compilerflag value="-I."/>
+		<compilerflag value="-Ilib_ogg/include"/>
+		<compilerflag value="-Ilib_vorbis/include"/>
+		<compilerflag value="-Ilib_vorbis/lib"/>
+
+		<file name="common/VideoExtract.cpp" />
+	</files>
+
+	<!-- libogg + libvorbis (los baja building/fetch_vorbis.sh). Simbolos ocultos para no chocar con el vorbis de Lime. -->
+	<files id="vorbis">
+		<compilerflag value="-Ilib_ogg/include"/>
+		<compilerflag value="-Ilib_vorbis/include"/>
+		<compilerflag value="-Ilib_vorbis/lib"/>
+		<compilerflag value="-fvisibility=hidden" unless="windows"/>
+
+		<file name="lib_ogg/src/bitwise.c" />
+		<file name="lib_ogg/src/framing.c" />
+		<file name="lib_vorbis/lib/analysis.c" />
+		<file name="lib_vorbis/lib/bitrate.c" />
+		<file name="lib_vorbis/lib/block.c" />
+		<file name="lib_vorbis/lib/codebook.c" />
+		<file name="lib_vorbis/lib/envelope.c" />
+		<file name="lib_vorbis/lib/floor0.c" />
+		<file name="lib_vorbis/lib/floor1.c" />
+		<file name="lib_vorbis/lib/info.c" />
+		<file name="lib_vorbis/lib/lookup.c" />
+		<file name="lib_vorbis/lib/lpc.c" />
+		<file name="lib_vorbis/lib/lsp.c" />
+		<file name="lib_vorbis/lib/mapping0.c" />
+		<file name="lib_vorbis/lib/mdct.c" />
+		<file name="lib_vorbis/lib/psy.c" />
+		<file name="lib_vorbis/lib/registry.c" />
+		<file name="lib_vorbis/lib/res0.c" />
+		<file name="lib_vorbis/lib/sharedbook.c" />
+		<file name="lib_vorbis/lib/smallft.c" />
+		<file name="lib_vorbis/lib/synthesis.c" />
+		<file name="lib_vorbis/lib/vorbisenc.c" />
+		<file name="lib_vorbis/lib/window.c" />
+	</files>
+
+	<set name="SLIBEXT" value=".lib" if="windows"/>
+	<set name="SLIBEXT" value=".a" unless="windows"/>
+	<set name="SLIBEXT" value=".so" if="webos"/>
+
+	<set name="DEBUGEXTRA" value="-debug" if="fulldebug" />
+
+	<target id="NDLL" output="${LIBPREFIX}funkfmpeg${DEBUGEXTRA}${LIBEXTRA}" tool="linker" toolid="${STD_MODULE_LINK}">
+		<outdir name="../ndll/${BINDIR}"/>
+		<ext value=".ndll" if="windows || mac || linux"/>
+		<files id="common"/>
+		<files id="vorbis"/>
+
+		<!-- En Android (static_link) el .a final se fusiona con los libav*.a en el CI.
+		     Orden importa en GNU ld: avformat > avcodec > swscale > swresample > avutil -->
+		<lib name="${FFMPEG_DIR}/lib/libavformat.a" unless="static_link"/>
+		<lib name="${FFMPEG_DIR}/lib/libavcodec.a" unless="static_link"/>
+		<lib name="${FFMPEG_DIR}/lib/libswscale.a" unless="static_link"/>
+		<lib name="${FFMPEG_DIR}/lib/libswresample.a" unless="static_link"/>
+		<lib name="${FFMPEG_DIR}/lib/libavutil.a" unless="static_link"/>
+
+		<lib name="-lm" if="linux || mac" unless="static_link"/>
+		<lib name="-lpthread" if="linux"/>
+		<lib name="ws2_32.lib" if="windows"/>
+		<lib name="secur32.lib" if="windows"/>
+		<lib name="bcrypt.lib" if="windows"/>
+		<lib name="user32.lib" if="windows"/>
+		<lib name="advapi32.lib" if="windows"/>
+
+		<flag value="-Wl,--allow-shlib-undefined" if="linux"/>
+		<!-- no exportar simbolos de FFmpeg: evita choques con otros libav del juego (ej. libs de video) -->
+		<flag value="-Wl,--exclude-libs,ALL" if="linux"/>
+		<flag value="-Wl,-Bsymbolic" if="linux"/>
+		<flag value="-undefined" if="mac"/>
+		<flag value="dynamic_lookup" if="mac"/>
+	</target>
+
+	<target id="default">
+		<target id="NDLL"/>
+	</target>
+</xml>
