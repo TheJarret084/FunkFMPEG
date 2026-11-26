@@ -1,3 +1,8 @@
+// El NDK/libc++ y stb usan INT_MAX; algunos toolchains no lo exponen desde <limits.h>.
+#ifndef INT_MAX
+#define INT_MAX 0x7fffffff
+#endif
+
 /*
  * FunkFMPEG video frame extractor (desktop, C++).
  * Demux/decode/scale: FFmpeg (libavformat, libavcodec, libswscale), enlazado ESTATICO.
