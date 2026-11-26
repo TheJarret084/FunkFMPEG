@@ -12,7 +12,7 @@
     "android"
   ],
   "description": "Indexed PNG spritesheets/tapes and video frame extraction (FFmpeg libav, statically linked; Windows/Linux/Android 64) for Haxe/Lime.",
-  "version": "1.4.0",
+  "version": "1.4.10",
   "classPath": "src",
   "releasenote": "1.4.0: VideoFrames now uses FFmpeg (static LGPL build) on Windows, Linux and Android arm64 instead of minimp4+h264bsd / MediaMetadataRetriever.",
   "contributors": [

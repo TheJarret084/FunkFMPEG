@@ -10,7 +10,7 @@ import sys.FileSystem;
  * Video/audio necesitan el ndll con FFmpeg (Windows/Linux/Android 64).
  */
 class FunkFMPEG {
-    public static inline var VERSION:String = "1.4.1";
+    public static inline var VERSION:String = "1.4.10";
 
     // ------------------------------------------------------------------ imagen
 
