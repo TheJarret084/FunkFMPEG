@@ -99,7 +99,9 @@ static bool open_source(Source &s, const std::string &path, bool decode, std::st
 	int e = avformat_open_input(&s.fmt, path.c_str(), nullptr, nullptr);
 	if (e < 0) { err = "no se pudo abrir video: " + av_err(e); return false; }
 	e = avformat_find_stream_info(s.fmt, nullptr);
-	if (e < 0) { err = "no se pudo leer info del video: " + av_err(e); return false; }
+	// En mp4 cortos/con mdat de 64 bits FFmpeg puede devolver AVERROR_INVALIDDATA/EOF
+	// despues de haber llenado los streams. ffprobe lo tolera; nosotros tambien.
+	if (e < 0 && s.fmt->nb_streams == 0) { err = "no se pudo leer info del video: " + av_err(e); return false; }
 	s.vi = av_find_best_stream(s.fmt, type, -1, -1, nullptr, 0);
 	if (s.vi < 0) { err = (type == AVMEDIA_TYPE_AUDIO) ? "no hay stream de audio" : "no hay stream de video"; return false; }
 	s.st = s.fmt->streams[s.vi];
@@ -134,10 +136,12 @@ static double stream_seconds(Source &s) {
 
 // ---------------------------------------------------------------- probe
 
+static void set_error(const std::string &e);
+
 static std::string probe_video(const std::string &path) {
 	Source s;
 	std::string err;
-	if (!open_source(s, path, false, err)) return "error:" + err;
+	if (!open_source(s, path, false, err)) { set_error(err); return "error:" + err; }
 	int w = s.st->codecpar->width, h = s.st->codecpar->height;
 	if (w <= 0 || h <= 0) return "error:tamano invalido";
 	char buf[128];

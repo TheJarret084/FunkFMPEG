@@ -25,11 +25,34 @@ class VideoFrames
 	static var _error:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_error", "s");
 	static var _cancel:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_cancel", "v");
 
+	static var lastError:String = "";
+
 	public static function probe(path:String):Null<VideoInfo>
 	{
-		try { return parseProbe(_probe(path)); }
-		catch (_:Dynamic) {}
-		return null;
+		lastError = "";
+		try
+		{
+			var raw = _probe(path);
+			if (raw == null)
+			{
+				lastError = error();
+				return null;
+			}
+			if (StringTools.startsWith(raw, "error:"))
+			{
+				lastError = raw.substr(6);
+				if (lastError == "" || lastError == "0") lastError = error();
+				return null;
+			}
+			var info = parseProbe(raw);
+			if (info == null) lastError = "probe: " + raw;
+			return info;
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+			return null;
+		}
 	}
 
 	public static function start(path:String, outDir:String, fpsMilli:Int, width:Int, height:Int, count:Int):Bool
@@ -41,7 +64,12 @@ class VideoFrames
 
 	public static function progress():Int { try { return _progress(); } catch (_:Dynamic) {} return 0; }
 	public static function state():Int { try { return _state(); } catch (_:Dynamic) {} return FAILED; }
-	public static function error():String { try { var e = _error(); return e == null ? "" : e; } catch (_:Dynamic) {} return "ndll funkfmpeg no disponible"; }
+	public static function error():String
+	{
+		if (lastError != "" && lastError != "0") return lastError;
+		try { var e = _error(); return e == null ? "" : Std.string(e); } catch (_:Dynamic) {}
+		return "ndll funkfmpeg no disponible";
+	}
 	public static function cancel():Void { try { _cancel(); } catch (_:Dynamic) {} }
 
 	#else
