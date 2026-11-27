@@ -12,9 +12,9 @@
     "android"
   ],
   "description": "Indexed PNG spritesheets/tapes and video frame extraction (FFmpeg libav, statically linked; Windows/Linux/Android 64) for Haxe/Lime.",
-  "version": "1.4.13",
+  "version": "1.4.14",
   "classPath": "src",
-  "releasenote": "1.4.13: API de video solo enteros/const char* (probe y start) para Android; FFmpeg compilado con --enable-everything. 1.4.12: probe de video tolera find_stream_info parcial y propaga el error nativo real. 1.4.11: Android compilado con -mno-outline-atomics (arregla dlopen failed: cannot locate symbol __aarch64_ldadd8_acq_rel). 1.4.0: VideoFrames now uses FFmpeg (static LGPL build) on Windows, Linux and Android arm64 instead of minimp4+h264bsd / MediaMetadataRetriever.",
+  "releasenote": "1.4.14: FFmpeg 7.1 compila todos los componentes internos (sin --disable-everything). 1.4.14: API de video solo enteros/const char* (probe y start) para Android; FFmpeg compilado con --enable-everything. 1.4.12: probe de video tolera find_stream_info parcial y propaga el error nativo real. 1.4.11: Android compilado con -mno-outline-atomics (arregla dlopen failed: cannot locate symbol __aarch64_ldadd8_acq_rel). 1.4.0: VideoFrames now uses FFmpeg (static LGPL build) on Windows, Linux and Android arm64 instead of minimp4+h264bsd / MediaMetadataRetriever.",
   "contributors": [
     "TheJarret084"
   ]

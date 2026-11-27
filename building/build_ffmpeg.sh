@@ -19,7 +19,6 @@ cd "$SRC"
 	--disable-programs --disable-doc --disable-debug \
 	--disable-autodetect --disable-network \
 	--disable-avdevice --disable-avfilter \
-	--enable-everything \
 	--enable-protocol=file \
 	"$@"
 
