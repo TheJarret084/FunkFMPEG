@@ -12,6 +12,9 @@
 		<compilerflag value="-Ilib_vorbis/include"/>
 		<compilerflag value="-Ilib_vorbis/lib"/>
 		<compilerflag value="--sysroot=${ANDROID_SYSROOT}" if="android" />
+		<!-- Android: sin esto un NDK nuevo (clang 12+) emite llamadas a __aarch64_ldadd8_acq_rel & co (outline atomics),
+		     que no existen en el NDK 21 con el que se enlaza el juego -> "dlopen failed: cannot locate symbol". -->
+		<compilerflag value="-mno-outline-atomics" if="android" />
 
 		<file name="common/VideoExtract.cpp" />
 	</files>
@@ -23,6 +26,7 @@
 		<compilerflag value="-Ilib_vorbis/lib"/>
 		<compilerflag value="--sysroot=${ANDROID_SYSROOT}" if="android" />
 		<compilerflag value="-fvisibility=hidden" unless="windows"/>
+		<compilerflag value="-mno-outline-atomics" if="android" />
 
 		<file name="lib_ogg/src/bitwise.c" />
 		<file name="lib_ogg/src/framing.c" />

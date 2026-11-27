@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: project/ffmpeg
-          key: ffmpeg-${{ matrix.name }}-${{ env.FFMPEG_TAG }}-${{ hashFiles('building/build_ffmpeg.sh') }}
+          key: ffmpeg-${{ matrix.name }}-${{ env.FFMPEG_TAG }}-${{ hashFiles('building/build_ffmpeg.sh', '.github/workflows/release.yml') }}
 
       # ---- Linux 64
       - name: FFmpeg (linux)
@@ -50,7 +50,9 @@ jobs:
         run: |
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
           TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          # -mno-outline-atomics: el juego enlaza con NDK 21, que no trae __aarch64_ldadd8_acq_rel & co.
           bash building/build_ffmpeg.sh "$PWD/project/ffmpeg" \
+            --extra-cflags="-mno-outline-atomics" --extra-cxxflags="-mno-outline-atomics" \
             --enable-cross-compile --target-os=android --arch=aarch64 --cpu=armv8-a \
             --cc="$TC/aarch64-linux-android21-clang" --cxx="$TC/aarch64-linux-android21-clang++" \
             --ar="$TC/llvm-ar" --nm="$TC/llvm-nm" --ranlib="$TC/llvm-ranlib" --strip="$TC/llvm-strip"
@@ -104,6 +106,11 @@ jobs:
           FF="$PWD/project/ffmpeg/lib"
           printf 'create merged.a\naddlib %s\naddlib %s/libavformat.a\naddlib %s/libavcodec.a\naddlib %s/libswscale.a\naddlib %s/libswresample.a\naddlib %s/libavutil.a\nsave\nend\n' "$LIB" "$FF" "$FF" "$FF" "$FF" "$FF" | "$AR" -M
           mv merged.a "$LIB"
+          # Guardia: ningun simbolo de outline atomics (ni sin resolver ni referenciado) puede quedar en el .a final.
+          NM="$NDKBIN/llvm-nm"
+          if "$NM" -A "$LIB" 2>/dev/null | grep -E '__aarch64_(ldadd|ldset|ldclr|ldeor|swp|cas)'; then
+            echo "::error::libfunkfmpeg.a usa outline atomics (rompe en NDK 21: cannot locate symbol __aarch64_...)"; exit 1
+          fi
 
       - name: Empaquetar (unix)
         if: matrix.name != 'windows-x64'
