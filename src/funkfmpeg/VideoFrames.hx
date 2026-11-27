@@ -117,9 +117,9 @@ class VideoFrames
 		{
 			var n = Std.int(_errorLen(0));
 			if (n <= 0 || n > 4096) return "";
-			var bytes = new Array<Int>();
-			for (i in 0...n) bytes.push(Std.int(_errorAt(i)) & 0xFF);
-			return String.fromCharCodes(bytes);
+			var out = "";
+			for (i in 0...n) out += String.fromCharCode(Std.int(_errorAt(i)) & 0xFF);
+			return out;
 		}
 		catch (_:Dynamic) {}
 		return "";
