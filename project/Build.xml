@@ -63,6 +63,7 @@
 	<target id="NDLL" output="${LIBPREFIX}funkfmpeg${DEBUGEXTRA}${LIBEXTRA}" tool="linker" toolid="${STD_MODULE_LINK}">
 		<outdir name="../ndll/${BINDIR}"/>
 		<ext value=".ndll" if="windows || mac || linux"/>
+		<ext value=".so" if="android"/>
 		<files id="common"/>
 		<files id="vorbis"/>
 
