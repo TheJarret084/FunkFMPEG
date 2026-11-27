@@ -74,6 +74,7 @@
 		<lib name="${FFMPEG_DIR}/lib/libavutil.a" unless="static_link"/>
 
 		<lib name="-lm" if="linux || mac" unless="static_link"/>
+		<lib name="-lm" if="android" unless="static_link"/>
 		<lib name="-lpthread" if="linux"/>
 		<lib name="ws2_32.lib" if="windows"/>
 		<lib name="secur32.lib" if="windows"/>
@@ -82,8 +83,10 @@
 		<lib name="advapi32.lib" if="windows"/>
 
 		<flag value="-Wl,--allow-shlib-undefined" if="linux"/>
+		<flag value="-Wl,--allow-shlib-undefined" if="android"/>
 		<!-- no exportar simbolos de FFmpeg: evita choques con otros libav del juego (ej. libs de video) -->
 		<flag value="-Wl,--exclude-libs,ALL" if="linux"/>
+		<flag value="-Wl,--exclude-libs,ALL" if="android"/>
 		<flag value="-Wl,-Bsymbolic" if="linux"/>
 		<flag value="-undefined" if="mac"/>
 		<flag value="dynamic_lookup" if="mac"/>

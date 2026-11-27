@@ -83,7 +83,7 @@ jobs:
         working-directory: project
         run: haxelib run hxcpp Build.xml -DHXCPP_M64 -DFFMPEG_DIR="$PWD/ffmpeg"
 
-      - name: Compilar ndll (android, estatico + fusion con libav)
+      - name: Compilar ndll (android, ndll real con FFmpeg dentro)
         if: matrix.name == 'android-arm64'
         shell: bash
         run: |
@@ -99,17 +99,20 @@ jobs:
             ln -sf "$NDKBIN/llvm-strip" "$TOOLBIN/$prefix-strip"
           done
           export PATH="$TOOLBIN:$PATH"
-          (cd project && haxelib run hxcpp Build.xml -Dandroid -DHXCPP_ARM64 -Dstatic_link -DFFMPEG_DIR="$PWD/ffmpeg" -DANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot")
+          # Igual que Lime: modulo dinamico con hx_set_loader/__neko_entry_point y FFmpeg enlazado dentro.
+          # Sin -Dstatic_link: los prims se exportan con EXPORT y hxcpp los carga por dlopen.
+          (cd project && haxelib run hxcpp Build.xml -Dandroid -DHXCPP_ARM64 -DFFMPEG_DIR="$PWD/ffmpeg" -DANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot")
           ls -R ndll
-          LIB="$(find ndll -name 'libfunkfmpeg*.a' | head -n1)"
-          [ -n "$LIB" ] || { echo "no se genero libfunkfmpeg.a"; exit 1; }
-          FF="$PWD/project/ffmpeg/lib"
-          printf 'create merged.a\naddlib %s\naddlib %s/libavformat.a\naddlib %s/libavcodec.a\naddlib %s/libswscale.a\naddlib %s/libswresample.a\naddlib %s/libavutil.a\nsave\nend\n' "$LIB" "$FF" "$FF" "$FF" "$FF" "$FF" | "$AR" -M
-          mv merged.a "$LIB"
-          # Guardia: ningun simbolo de outline atomics (ni sin resolver ni referenciado) puede quedar en el .a final.
+          LIB="$(find ndll -name 'libfunkfmpeg*.so' | head -n1)"
+          [ -n "$LIB" ] || { echo "no se genero libfunkfmpeg.so"; exit 1; }
+          # Lime/Android carga libfunkfmpeg.so (sin sufijo -64).
+          if [ "$LIB" != "$(dirname "$LIB")/libfunkfmpeg.so" ]; then cp "$LIB" "$(dirname "$LIB")/libfunkfmpeg.so"; fi
           NM="$NDKBIN/llvm-nm"
           if "$NM" -A "$LIB" 2>/dev/null | grep -E '__aarch64_(ldadd|ldset|ldclr|ldeor|swp|cas)'; then
-            echo "::error::libfunkfmpeg.a usa outline atomics (rompe en NDK 21: cannot locate symbol __aarch64_...)"; exit 1
+            echo "::error::libfunkfmpeg.so usa outline atomics (rompe en NDK 21)"; exit 1
+          fi
+          if ! "$NM" -D "$LIB" 2>/dev/null | grep -q 'hx_set_loader'; then
+            echo "::error::libfunkfmpeg.so no exporta hx_set_loader"; exit 1
           fi
 
       - name: Empaquetar (unix)
