@@ -19,11 +19,8 @@ cd "$SRC"
 	--disable-programs --disable-doc --disable-debug \
 	--disable-autodetect --disable-network \
 	--disable-avdevice --disable-avfilter \
-	--disable-everything \
+	--enable-everything \
 	--enable-protocol=file \
-	--enable-demuxer=mov,matroska,avi,flv,mpegts,mpegps,ogg,gif,mpegvideo,h264,hevc,mp3,wav,flac,aac \
-	--enable-parser=h264,hevc,vp8,vp9,av1,mpeg4video,mpegvideo,mpegaudio,aac,opus,vorbis,flac \
-	--enable-decoder=h264,hevc,vp8,vp9,mpeg4,mpeg2video,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3,wmv1,wmv2,wmv3,theora,vp6,vp6f,flv,gif,mjpeg,png,prores,rawvideo,mp3,mp3float,aac,vorbis,opus,flac,alac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,adpcm_ima_wav,adpcm_ms \
 	"$@"
 
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"

@@ -448,20 +448,86 @@ static int audio_to_ogg(const std::string &path, const std::string &outPath, int
 
 // ---------------------------------------------------------------- Prime
 
-static HxString funkfmpeg_video_probe(HxString path) {
-	std::string out = probe_video(path.c_str());
-	return HxString(out.c_str(), (int)out.size(), true);
-}
-DEFINE_PRIME1(funkfmpeg_video_probe);
+/*
+ * API "dura" para hxcpp: solo enteros y const char*. Prime.load con HxString estuvo
+ * devolviendo 0 en Android (marshalling del valor de retorno), asi que el probe y el
+ * start se exponen tambien con tipos C basicos. El error se lee byte a byte.
+ */
+static int g_probeOk = 0;
+static int g_probeW = 0;
+static int g_probeH = 0;
+static int g_probeFpsMilli = 0;
+static int g_probeSecondsMilli = 0;
 
-static int funkfmpeg_video_start(HxString path, HxString outDir, int fpsMilli, int width, int height, int count) {
+static int probe_i(const char *path)
+{
+	g_probeOk = 0;
+	g_probeW = g_probeH = g_probeFpsMilli = g_probeSecondsMilli = 0;
+	set_error("");
+	std::string out = probe_video(path ? path : "");
+	if (out.compare(0, 6, "error:") == 0)
+	{
+		set_error(out.substr(6));
+		return 0;
+	}
+	double fps = 0, seconds = 0;
+	if (std::sscanf(out.c_str(), "%d,%d,%lf,%lf", &g_probeW, &g_probeH, &fps, &seconds) != 4 ||
+	    g_probeW <= 0 || g_probeH <= 0)
+	{
+		set_error("probe: " + out);
+		return 0;
+	}
+	g_probeFpsMilli = (int)std::llround(fps * 1000.0);
+	g_probeSecondsMilli = (int)std::llround(seconds * 1000.0);
+	g_probeOk = 1;
+	return 1;
+}
+
+static int funkfmpeg_video_probe_i(const char *path) { return probe_i(path); }
+DEFINE_PRIME1(funkfmpeg_video_probe_i);
+
+static int funkfmpeg_video_probe_w_i(int dummy) { (void)dummy; return g_probeW; }
+DEFINE_PRIME1(funkfmpeg_video_probe_w_i);
+
+static int funkfmpeg_video_probe_h_i(int dummy) { (void)dummy; return g_probeH; }
+DEFINE_PRIME1(funkfmpeg_video_probe_h_i);
+
+static int funkfmpeg_video_probe_fps_i(int dummy) { (void)dummy; return g_probeFpsMilli; }
+DEFINE_PRIME1(funkfmpeg_video_probe_fps_i);
+
+static int funkfmpeg_video_probe_seconds_i(int dummy) { (void)dummy; return g_probeSecondsMilli; }
+DEFINE_PRIME1(funkfmpeg_video_probe_seconds_i);
+
+static int funkfmpeg_video_error_len_i(int dummy) {
+	(void)dummy;
+	std::lock_guard<std::mutex> lock(g_errMutex);
+	return (int)g_error.size();
+}
+DEFINE_PRIME1(funkfmpeg_video_error_len_i);
+
+static int funkfmpeg_video_error_at_i(int index) {
+	std::lock_guard<std::mutex> lock(g_errMutex);
+	if (index < 0 || index >= (int)g_error.size()) return 0;
+	return (unsigned char)g_error[index];
+}
+DEFINE_PRIME1(funkfmpeg_video_error_at_i);
+
+static int funkfmpeg_video_progress_i(int dummy) { (void)dummy; return g_progress; }
+DEFINE_PRIME1(funkfmpeg_video_progress_i);
+
+static int funkfmpeg_video_state_i(int dummy) { (void)dummy; return g_state; }
+DEFINE_PRIME1(funkfmpeg_video_state_i);
+
+static int funkfmpeg_video_cancel_i(int dummy) { (void)dummy; g_cancel = true; return 1; }
+DEFINE_PRIME1(funkfmpeg_video_cancel_i);
+
+static int start_impl(const std::string &p, const std::string &o, int fpsMilli, int width, int height, int count)
+{
 	if (g_state == 1) return 0;
 	g_cancel = false;
 	set_error("");
 	g_progress = 0;
 	g_state = 1;
-	std::string p = path.c_str();
-	std::string o = outDir.c_str();
 	try {
 		std::thread([p, o, fpsMilli, width, height, count]() {
 			extract_frames(p, o, fpsMilli, width, height, count);
@@ -472,6 +538,22 @@ static int funkfmpeg_video_start(HxString path, HxString outDir, int fpsMilli, i
 		return 0;
 	}
 	return 1;
+}
+
+static int funkfmpeg_video_start_c(const char *path, const char *outDir, int fpsMilli, int width, int height, int count)
+{
+	return start_impl(path ? path : "", outDir ? outDir : "", fpsMilli, width, height, count);
+}
+DEFINE_PRIME6(funkfmpeg_video_start_c);
+
+static HxString funkfmpeg_video_probe(HxString path) {
+	std::string out = probe_video(path.c_str());
+	return HxString(out.c_str(), (int)out.size(), true);
+}
+DEFINE_PRIME1(funkfmpeg_video_probe);
+
+static int funkfmpeg_video_start(HxString path, HxString outDir, int fpsMilli, int width, int height, int count) {
+	return start_impl(path.c_str(), outDir.c_str(), fpsMilli, width, height, count);
 }
 DEFINE_PRIME6(funkfmpeg_video_start);
 

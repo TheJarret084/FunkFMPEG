@@ -1,6 +1,7 @@
 package funkfmpeg;
 
 #if cpp
+import cpp.ConstCharStar;
 import cpp.Prime;
 #end
 
@@ -8,6 +9,8 @@ import cpp.Prime;
  * Extraccion de frames de video para FunkFMPEG.
  *
  * cpp (Windows/Linux/Android 64): ndll nativo C++ con FFmpeg (libavformat/libavcodec/libswscale) enlazado estatico.
+ * La API Prime usa enteros y `const char*` (no `String`) porque el marshalling de HxString
+ * devolvia 0 en Android y hacia creer que el video no se podia leer.
  */
 class VideoFrames
 {
@@ -18,12 +21,17 @@ class VideoFrames
 	public static inline var CANCELLED:Int = 4;
 
 	#if cpp
-	static var _probe:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_probe", "ss");
-	static var _start:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_start", "ssiiiii");
-	static var _progress:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_progress", "i");
-	static var _state:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_state", "i");
-	static var _error:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_error", "s");
-	static var _cancel:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_cancel", "v");
+	static var _probeI:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_probe_i", "ci");
+	static var _probeW:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_probe_w_i", "ii");
+	static var _probeH:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_probe_h_i", "ii");
+	static var _probeFps:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_probe_fps_i", "ii");
+	static var _probeSeconds:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_probe_seconds_i", "ii");
+	static var _startC:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_start_c", "cciiiii");
+	static var _progressI:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_progress_i", "ii");
+	static var _stateI:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_state_i", "ii");
+	static var _errorLen:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_error_len_i", "ii");
+	static var _errorAt:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_error_at_i", "ii");
+	static var _cancelI:Dynamic = Prime.load("funkfmpeg", "funkfmpeg_video_cancel_i", "ii");
 
 	static var lastError:String = "";
 
@@ -32,21 +40,31 @@ class VideoFrames
 		lastError = "";
 		try
 		{
-			var raw = _probe(path);
-			if (raw == null)
+			if (_probeI(ConstCharStar.fromString(path)) != 1)
 			{
-				lastError = error();
+				lastError = readNativeError();
+				if (lastError == "") lastError = "no se pudo leer el video (decoder nativo)";
 				return null;
 			}
-			if (StringTools.startsWith(raw, "error:"))
+
+			var w = Std.int(_probeW(0));
+			var h = Std.int(_probeH(0));
+			var fpsMilli = Std.int(_probeFps(0));
+			var secondsMilli = Std.int(_probeSeconds(0));
+			if (w <= 0 || h <= 0)
 			{
-				lastError = raw.substr(6);
-				if (lastError == "" || lastError == "0") lastError = error();
+				lastError = "tamano de video invalido";
 				return null;
 			}
-			var info = parseProbe(raw);
-			if (info == null) lastError = "probe: " + raw;
-			return info;
+
+			var fps = fpsMilli / 1000;
+			var seconds = secondsMilli / 1000;
+			return {
+				w: w,
+				h: h,
+				fps: fps > 0 ? fps : 30,
+				seconds: seconds > 0 ? seconds : 0
+			};
 		}
 		catch (e:Dynamic)
 		{
@@ -57,21 +75,55 @@ class VideoFrames
 
 	public static function start(path:String, outDir:String, fpsMilli:Int, width:Int, height:Int, count:Int):Bool
 	{
-		try { return _start(path, outDir, fpsMilli, width, height, count) == 1; }
-		catch (_:Dynamic) {}
-		return false;
+		lastError = "";
+		try
+		{
+			return _startC(ConstCharStar.fromString(path), ConstCharStar.fromString(outDir), fpsMilli, width, height, count) == 1;
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+			return false;
+		}
 	}
 
-	public static function progress():Int { try { return _progress(); } catch (_:Dynamic) {} return 0; }
-	public static function state():Int { try { return _state(); } catch (_:Dynamic) {} return FAILED; }
+	public static function progress():Int
+	{
+		try { return Std.int(_progressI(0)); } catch (_:Dynamic) {}
+		return 0;
+	}
+
+	public static function state():Int
+	{
+		try { return Std.int(_stateI(0)); } catch (_:Dynamic) {}
+		return FAILED;
+	}
+
 	public static function error():String
 	{
 		if (lastError != "" && lastError != "0") return lastError;
-		try { var e = _error(); return e == null ? "" : Std.string(e); } catch (_:Dynamic) {}
-		return "ndll funkfmpeg no disponible";
+		return readNativeError();
 	}
-	public static function cancel():Void { try { _cancel(); } catch (_:Dynamic) {} }
 
+	public static function cancel():Void
+	{
+		try { _cancelI(0); } catch (_:Dynamic) {}
+	}
+
+	/** El error nativo se lee byte a byte para no depender del marshalling de String. */
+	static function readNativeError():String
+	{
+		try
+		{
+			var n = Std.int(_errorLen(0));
+			if (n <= 0 || n > 4096) return "";
+			var bytes = new Array<Int>();
+			for (i in 0...n) bytes.push(Std.int(_errorAt(i)) & 0xFF);
+			return String.fromCharCodes(bytes);
+		}
+		catch (_:Dynamic) {}
+		return "";
+	}
 	#else
 	public static function probe(path:String):Null<VideoInfo> return null;
 	public static function start(path:String, outDir:String, fpsMilli:Int, width:Int, height:Int, count:Int):Bool return false;
@@ -80,19 +132,6 @@ class VideoFrames
 	public static function error():String return "VideoFrames nativo no disponible en esta plataforma";
 	public static function cancel():Void {}
 	#end
-
-	static function parseProbe(text:String):Null<VideoInfo>
-	{
-		if (text == null || StringTools.startsWith(text, "error:")) return null;
-		var parts = text.split(",");
-		if (parts.length < 4) return null;
-		var w = Std.parseInt(parts[0]);
-		var h = Std.parseInt(parts[1]);
-		var fps = Std.parseFloat(parts[2]);
-		var seconds = Std.parseFloat(parts[3]);
-		if (w == null || h == null || w <= 0 || h <= 0) return null;
-		return {w: w, h: h, fps: Math.isNaN(fps) || fps <= 0 ? 30 : fps, seconds: Math.isNaN(seconds) ? 0 : seconds};
-	}
 }
 
 typedef VideoInfo =
