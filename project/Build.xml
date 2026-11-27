@@ -3,6 +3,7 @@
 
 	<!-- FFmpeg estatico (lo deja building/build_ffmpeg.sh). Se puede cambiar con -DFFMPEG_DIR=ruta -->
 	<set name="FFMPEG_DIR" value="${this_dir}/ffmpeg" unless="FFMPEG_DIR" />
+	<set name="LIBEXTRA" value="-64" if="android" />
 
 	<files id="common">
 		<compilerflag value="-I${FFMPEG_DIR}/include"/>

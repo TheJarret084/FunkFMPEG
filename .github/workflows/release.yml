@@ -98,7 +98,8 @@ jobs:
             ln -sf "$NDKBIN/llvm-ranlib" "$TOOLBIN/$prefix-ranlib"
             ln -sf "$NDKBIN/llvm-strip" "$TOOLBIN/$prefix-strip"
           done
-          export PATH="$TOOLBIN:$PATH"
+          # hxcpp invoca `clang++` por nombre: tiene que ser el del NDK, no el del runner.
+          export PATH="$NDKBIN:$TOOLBIN:$PATH"
           # Igual que Lime: modulo dinamico con hx_set_loader/__neko_entry_point y FFmpeg enlazado dentro.
           # Sin -Dstatic_link: los prims se exportan con EXPORT y hxcpp los carga por dlopen.
           (cd project && haxelib run hxcpp Build.xml -Dandroid -DHXCPP_ARM64 -DFFMPEG_DIR="$PWD/ffmpeg" -DANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot")
